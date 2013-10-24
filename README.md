@@ -22,7 +22,7 @@
     [
       "http://url.to/upload/to",
       "http://url.to/upload/to-stage"
-    ]
+    ],
     "/another/path/to/file/to/be/uploaded":
     [
       "http://another.url.to/upload/to",
