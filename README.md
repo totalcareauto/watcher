@@ -22,6 +22,9 @@ You may wish to redirect the output to a log file.
 
 ```json
 {
+  "log_file": "/path/to/log/file.log",
+  "air_brake_key": "a2cf259b377...",
+  "production": true,
   "watch": "/path/to/file/to/be/watched",
   "files": {
     "/path/to/file/to/be/uploaded":
@@ -41,4 +44,5 @@ You may wish to redirect the output to a log file.
 In this example when ever the file `/path/to/file/to/be/watched` is updated the file
 `/path/to/file/to/be/uploaded` is uploaded to `http://url.to/upload/to` and `http://url.to/upload/to-stage`, 
 also the file `/another/path/to/file/to/be/uploaded` is uploaded to `http://another.url.to/upload/to` and
-`http://another.url.to/upload/to-stage`.
+`http://another.url.to/upload/to-stage`. Additionally, any errors will be logged to airbrake with the supplied 
+airbrake key.  Other info/error information will the logged to the specified log file.
