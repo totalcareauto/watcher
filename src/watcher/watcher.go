@@ -83,7 +83,8 @@ func doUpload(file, url string) {
 		log.Println("Could not open upload file", file, err)
 	} else {
 		defer fp.Close()
-		_, err := http.Post(url, "text/plain", fp)
+		resp, err := http.Post(url, "text/plain", fp)
+		resp.Body.Close()
 		if err != nil {
 			logger.Println("Error uploading file", file, err)
 			airbrake.Notify(err)
@@ -127,6 +128,7 @@ func (config *Config) initialize() {
 }
 
 func main() {
+
 	config := loadConfig()
 	config.initialize()
 	config.watch()
