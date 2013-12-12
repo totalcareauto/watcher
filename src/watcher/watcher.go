@@ -79,6 +79,11 @@ func watchFile(path string) chan bool {
 }
 
 func doUpload(file, url string) {
+	defer func() {
+		if errStr := recover(); errStr != nil {
+			log.Println("Error (", errStr, ") uploading file ", file, " to URL ", url)
+		}
+	}()
 	if fp, err := os.Open(file); err != nil {
 		log.Println("Could not open upload file", file, err)
 	} else {
@@ -95,6 +100,11 @@ func doUpload(file, url string) {
 }
 
 func (config *Config) doUploads() {
+	defer func() {
+		if errStr := recover(); errStr != nil {
+			log.Println("error in doUploads(): ", errStr)
+		}
+	}()
 	for file, urls := range config.Files {
 		for _, url := range urls {
 			logger.Println("uploading ", file, " to ", url)
@@ -107,7 +117,7 @@ func (config *Config) watch() {
 	ch := watchFile(config.Watch)
 	for {
 		<-ch
-		logger.Println("Watched file changed attempting uploads")
+		logger.Println("Watched file changed.  Attempting uploads")
 		config.doUploads()
 	}
 }
