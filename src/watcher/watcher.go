@@ -125,7 +125,9 @@ func (config *Config) watch() {
 func (config *Config) initialize() {
 	// setup rollbar
 	rollbar.Token = config.RollbarToken
-	if !config.Production {
+	if config.Production {
+		rollbar.Environment = "production"
+	} else {
 		rollbar.Environment = "development"
 	}
 
