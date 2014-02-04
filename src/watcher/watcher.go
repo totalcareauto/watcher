@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/tobi/airbrake-go"
+	"github.com/stvp/rollbar"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,11 +12,11 @@ import (
 )
 
 type Config struct {
-	Production  bool                `json:"production"`
-	LogFile     string              `json:"log_file""`
-	AirBrakeKey string              `json:"air_brake_key"`
-	Watch       string              `json:"watch"`
-	Files       map[string][]string `json:"files"`
+	Production   bool                `json:"production"`
+	LogFile      string              `json:"log_file""`
+	RollbarToken string              `json:"rollbar_token"`
+	Watch        string              `json:"watch"`
+	Files        map[string][]string `json:"files"`
 }
 
 var configPath string
@@ -64,12 +64,12 @@ func watchFile(path string) chan bool {
 					}
 				} else {
 					logger.Println("Could not get file info for", path, err)
-					airbrake.Notify(err)
+					rollbar.Error("error", err)
 				}
 				fp.Close()
 			} else {
 				logger.Println("Could not open file ", path, err)
-				airbrake.Notify(err)
+				rollbar.Error("error", err)
 			}
 			time.Sleep(time.Second * 10)
 		}
@@ -92,7 +92,7 @@ func doUpload(file, url string) {
 		resp.Body.Close()
 		if err != nil {
 			logger.Println("Error uploading file", file, err)
-			airbrake.Notify(err)
+			rollbar.Error("error", err)
 		} else {
 			logger.Println("Uploaded file ", file)
 		}
@@ -123,10 +123,10 @@ func (config *Config) watch() {
 }
 
 func (config *Config) initialize() {
-	// setup airbrake
-	airbrake.ApiKey = config.AirBrakeKey
-	if config.Production {
-		airbrake.Environment = "production"
+	// setup rollbar
+	rollbar.Token = config.RollbarToken
+	if !config.Production {
+		rollbar.Environment = "development"
 	}
 
 	// open the log output file
