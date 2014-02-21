@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
+	"fmt"
+	"github.com/mreiferson/go-httpclient"
 	"github.com/stvp/rollbar"
 	"io/ioutil"
 	"log"
@@ -81,15 +84,31 @@ func watchFile(path string) chan bool {
 func doUpload(file, url string) {
 	defer func() {
 		if errStr := recover(); errStr != nil {
-			log.Println("Error (", errStr, ") uploading file ", file, " to URL ", url)
+			fullErrStr := fmt.Sprintln("Error (", errStr, ") uploading file ", file, " to URL ", url)
+			logger.Println(fullErrStr)
+			rollbar.Error("error", errors.New(fullErrStr))
 		}
 	}()
 	if fp, err := os.Open(file); err != nil {
 		log.Println("Could not open upload file", file, err)
+		rollbar.Error("error", err)
 	} else {
 		defer fp.Close()
-		resp, err := http.Post(url, "text/plain", fp)
-		resp.Body.Close()
+		transport := &httpclient.Transport{
+			ConnectTimeout:        5 * time.Second,
+			RequestTimeout:        10 * time.Second,
+			ResponseHeaderTimeout: 60 * time.Second,
+		}
+		defer transport.Close()
+		client := &http.Client{Transport: transport}
+		req, err := http.NewRequest("POST", url, fp)
+		if err != nil {
+			logger.Println("Error creating HTTP request", err)
+			rollbar.Error("error", err)
+			return
+		}
+		resp, err := client.Do(req)
+		defer resp.Body.Close()
 		if err != nil {
 			logger.Println("Error uploading file", file, err)
 			rollbar.Error("error", err)
