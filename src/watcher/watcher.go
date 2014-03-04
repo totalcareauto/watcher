@@ -5,10 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/mreiferson/go-httpclient"
 	"github.com/stvp/rollbar"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -57,6 +57,7 @@ func watchFile(path string) chan bool {
 	lastTime = 0
 
 	go func() {
+		old := false
 		for {
 			if fp, err := os.Open(path); err == nil {
 				fileInfo, err := fp.Stat()
@@ -64,6 +65,16 @@ func watchFile(path string) chan bool {
 					if fileInfo.ModTime().Unix() > lastTime {
 						lastTime = fileInfo.ModTime().Unix()
 						ch <- true
+					}
+					if math.Abs(time.Now().Sub(fileInfo.ModTime()).Hours()) > 4 {
+						logger.Println("Watch file is over four hours old")
+						if !old {
+							err = errors.New("Watch file is over four hours old")
+							rollbar.Error("error", err)
+						}
+						old = true
+					} else {
+						old = false
 					}
 				} else {
 					logger.Println("Could not get file info for", path, err)
@@ -94,26 +105,13 @@ func doUpload(file, url string) {
 		rollbar.Error("error", err)
 	} else {
 		defer fp.Close()
-		transport := &httpclient.Transport{
-			ConnectTimeout:        5 * time.Second,
-			RequestTimeout:        10 * time.Second,
-			ResponseHeaderTimeout: 60 * time.Second,
-		}
-		defer transport.Close()
-		client := &http.Client{Transport: transport}
-		req, err := http.NewRequest("POST", url, fp)
-		if err != nil {
-			logger.Println("Error creating HTTP request", err)
-			rollbar.Error("error", err)
-			return
-		}
-		resp, err := client.Do(req)
-		defer resp.Body.Close()
+		resp, err := http.Post(url, "text/plain", fp)
 		if err != nil {
 			logger.Println("Error uploading file", file, err)
 			rollbar.Error("error", err)
 		} else {
 			logger.Println("Uploaded file ", file)
+			resp.Body.Close()
 		}
 	}
 }
