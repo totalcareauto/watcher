@@ -1,0 +1,16 @@
+{
+  "log_file": "/Users/bjohnson/Desktop/watcher.log",
+  "rollbar_token": "f0afd37e74fc4e6f97e8023fd2843e51",
+  "production": false,
+  "watch": "/Users/bjohnson/Desktop/FILE",
+  "files": {
+    "/Users/bjohnson/Desktop/file1.txt": [
+      "http://localhost:1337/some_path",
+      "http://localhost:1337/some_path_stage"
+    ],
+    "/users/bjohnson/Desktop/file2.txt": [
+      "http://localhost:1337/another_path",
+      "http://localhost:1337/another_path_stage"
+    ]
+  }
+}

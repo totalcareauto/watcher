@@ -1,0 +1,14 @@
+{
+	"ImportPath": "the-watcher",
+	"GoVersion": "go1.3.3",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/stvp/rollbar",
+			"Comment": "v0.1.0",
+			"Rev": "427aa5688b6fa56e3617a02946e2345393cd6753"
+		}
+	]
+}

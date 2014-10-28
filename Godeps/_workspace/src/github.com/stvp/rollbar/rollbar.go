@@ -16,7 +16,14 @@ import (
 
 const (
 	NAME    = "go-rollbar"
-	VERSION = "0.0.4"
+	VERSION = "0.1.0"
+
+	// Severity levels
+	CRIT  = "critical"
+	ERR   = "error"
+	WARN  = "warning"
+	INFO  = "info"
+	DEBUG = "debug"
 )
 
 var (
@@ -32,13 +39,25 @@ var (
 
 	// Maximum number of errors allowed in the sending queue before we start
 	// dropping new errors on the floor.
-	Buffer = 100
+	Buffer = 1000
 
 	// Queue of messages to be sent.
 	bodyChannel chan map[string]interface{}
-	once        sync.Once
 	waitGroup   sync.WaitGroup
 )
+
+// -- Setup
+
+func init() {
+	bodyChannel = make(chan map[string]interface{}, Buffer)
+
+	go func() {
+		for body := range bodyChannel {
+			post(body)
+			waitGroup.Done()
+		}
+	}()
+}
 
 // -- Error reporting
 
@@ -50,11 +69,11 @@ func Error(level string, err error) {
 // ErrorWithStackSkip asynchronously sends an error to Rollbar with the given
 // severity level and a given number of stack trace frames skipped.
 func ErrorWithStackSkip(level string, err error, skip int) {
-	once.Do(initChannel)
-
 	body := buildBody(level, err.Error())
 	data := body["data"].(map[string]interface{})
-	data["body"] = errorBody(err, skip)
+	errBody, fingerprint := errorBody(err, skip)
+	data["body"] = errBody
+	data["fingerprint"] = fingerprint
 
 	push(body)
 }
@@ -64,8 +83,6 @@ func ErrorWithStackSkip(level string, err error, skip int) {
 // Message asynchronously sends a message to Rollbar with the given severity
 // level. Rollbar request is asynchronous.
 func Message(level string, msg string) {
-	once.Do(initChannel)
-
 	body := buildBody(level, msg)
 	data := body["data"].(map[string]interface{})
 	data["body"] = messageBody(msg)
@@ -108,16 +125,19 @@ func buildBody(level, title string) map[string]interface{} {
 
 // Build an error inner-body for the given error. If skip is provided, that
 // number of stack trace frames will be skipped.
-func errorBody(err error, skip int) map[string]interface{} {
-	return map[string]interface{}{
+func errorBody(err error, skip int) (map[string]interface{}, string) {
+	stack := BuildStack(3 + skip)
+	fingerprint := stack.Fingerprint()
+	errBody := map[string]interface{}{
 		"trace": map[string]interface{}{
-			"frames": stacktraceFrames(3 + skip),
+			"frames": stack,
 			"exception": map[string]interface{}{
 				"class":   errorClass(err),
 				"message": err.Error(),
 			},
 		},
 	}
+	return errBody, fingerprint
 }
 
 // Build a message inner-body for the given message string.
@@ -143,44 +163,43 @@ func errorClass(err error) string {
 
 // -- POST handling
 
-// Start a goroutine that sends all errors and messages to Rollbar.
-func initChannel() {
-	bodyChannel = make(chan map[string]interface{}, Buffer)
-
-	go func() {
-		for body := range bodyChannel {
-			post(body)
-			waitGroup.Done()
-		}
-	}()
-}
-
 // Queue the given JSON body to be POSTed to Rollbar.
 func push(body map[string]interface{}) {
 	if len(bodyChannel) < Buffer {
 		waitGroup.Add(1)
 		bodyChannel <- body
+	} else {
+		stderr("buffer full, dropping error on the floor")
 	}
 }
 
 // POST the given JSON body to Rollbar synchronously.
 func post(body map[string]interface{}) {
 	if len(Token) == 0 {
-		stderr("Token is empty")
+		stderr("empty token")
 		return
 	}
 
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
-		stderr(fmt.Sprintf("Rollbar payload couldn't be encoded: %s", err.Error()))
+		stderr("failed to encode payload: %s", err.Error())
 		return
 	}
 
 	resp, err := http.Post(Endpoint, "application/json", bytes.NewReader(jsonBody))
-	defer resp.Body.Close()
 	if err != nil {
-		stderr(fmt.Sprintf("Rollbar POST failed: %s", err.Error()))
+		stderr("POST failed: %s", err.Error())
 	} else if resp.StatusCode != 200 {
-		stderr(fmt.Sprintf("Rollbar response: %s", resp.Status))
+		stderr("received response: %s", resp.Status)
 	}
+	if resp != nil {
+		resp.Body.Close()
+	}
+}
+
+// -- stderr
+
+func stderr(format string, args ...interface{}) {
+	format = "Rollbar error: " + format + "\n"
+	fmt.Fprintf(os.Stderr, format, args...)
 }

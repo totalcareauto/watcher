@@ -5,13 +5,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/stvp/rollbar"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
 	"os"
 	"time"
+	"watcher/Godeps/_workspace/src/github.com/stvp/rollbar"
 )
 
 type Config struct {
@@ -105,7 +105,10 @@ func doUpload(file, url string) {
 		rollbar.Error("error", err)
 	} else {
 		defer fp.Close()
-		resp, err := http.Post(url, "text/plain", fp)
+		client := &http.Client{
+			Timeout: time.Minute * 3,
+		}
+		resp, err := client.Post(url, "text/plain", fp)
 		if err != nil {
 			logger.Println("Error uploading file", file, err)
 			rollbar.Error("error", err)

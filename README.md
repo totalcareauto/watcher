@@ -2,13 +2,11 @@
 
 ### Requirements
 
-- Go (`brew install` go for macos with brew)
-- Go cross compiliation support (see https://github.com/davecheney/golang-crosscompile)
+- Go (`brew install go` for macos with brew)
+- Go cross compilation support (see https://github.com/davecheney/golang-crosscompile)
 
 ### To Build
 
-- cd to project root
-- ``export GOPATH=`pwd` ``
 - `GOOS=windows GOARCH=amd64 go install watcher`
 - `GOOS=windows GOARCH=386 go install watcher`
 
