@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+
 	"watcher/Godeps/_workspace/src/github.com/stvp/rollbar"
 )
 
@@ -51,30 +52,42 @@ func loadConfig() *Config {
 	return &watcherConfig
 }
 
+func checkForStale(path string) {
+	go func() {
+		for {
+			if time.Now().Hour() >= 7 {
+				if fp, err := os.Open(path); err == nil {
+					if fileInfo, err := fp.Stat(); err == nil {
+						if math.Abs(time.Now().Sub(fileInfo.ModTime()).Hours()) > 1 {
+							message := "Watch file " + fileInfo.Name() + " is over one hour old."
+							logger.Println(message)
+							err = errors.New(message)
+							rollbar.Error("error", err)
+						}
+					}
+					fp.Close()
+				}
+			}
+
+			time.Sleep(time.Minute * 10)
+		}
+	}()
+}
+
 func watchFile(path string) chan bool {
 	var ch chan bool = make(chan bool)
 	var lastTime int64
 	lastTime = 0
 
+	checkForStale(path)
+
 	go func() {
-		old := false
 		for {
 			if fp, err := os.Open(path); err == nil {
-				fileInfo, err := fp.Stat()
-				if err == nil {
+				if fileInfo, err := fp.Stat(); err == nil {
 					if fileInfo.ModTime().Unix() > lastTime {
 						lastTime = fileInfo.ModTime().Unix()
 						ch <- true
-					}
-					if math.Abs(time.Now().Sub(fileInfo.ModTime()).Hours()) > 4 {
-						logger.Println("Watch file is over four hours old")
-						if !old {
-							err = errors.New("Watch file is over four hours old")
-							rollbar.Error("error", err)
-						}
-						old = true
-					} else {
-						old = false
 					}
 				} else {
 					logger.Println("Could not get file info for", path, err)
